@@ -71,7 +71,7 @@ impl fmt::Display for CheckPointInfo {
         write!(f, "{{\n")?;
         write!(f, "    \"blocknum\": {},\n", self.block_number)?;
         write!(f, "    \"position\": {},\n", self.position)?;
-        write!(f, "    \"mmr_root\": {},\n", String::from("0x") + &self.mmr_root)?;
+        write!(f, "    \"parent_mmr_root\": {},\n", String::from("0x") + &self.mmr_root)?;
         write!(f, "    \"peaks\": [\n")?;
         for (count, v) in self.peaks.iter().enumerate() {
             if count != 0 { write!(f, ",\n")?; }
@@ -88,6 +88,11 @@ async fn main() {
     let args: Vec<String> = env::args().collect();
     let url = args[1].clone();
     let block_num = args[2].parse::<u64>().unwrap();
+    let verify_num = args[3].parse::<u64>().unwrap();
+    if verify_num >= block_num {
+        println!("verify_num cannot bigger then block_num");
+        return
+    }
     let target_pos = mmr::leaf_index_to_pos(block_num);
     let target_peaks = mmr::get_peaks(target_pos);
     let print_peaks = target_peaks.iter().fold(
@@ -120,7 +125,7 @@ async fn main() {
 
     // ############## generate mmr proof #################
     // 1. cal proof positions
-    let check_pos = mmr::leaf_index_to_pos(block_num - 1);
+    let check_pos = mmr::leaf_index_to_pos(verify_num);
     let mmr_size = mmr::leaf_index_to_pos(block_num);
     let (merkle_proof_pos, peaks_pos, peak_pos) = mmr::gen_proof_positions(check_pos, mmr_size);
 
