@@ -50,13 +50,18 @@ pub async fn query_positions(url: &str, positions: Vec<u64>) -> Vec<(u64, [u8; 3
         }
     );
     let query_data = query_subql(&url, &positions_str).await;
-    query_data.data.node_entities.iter().map(|hash| {
+    let mut unsorted: Vec<(u64, [u8; 32], usize)> = query_data.data.node_entities.iter().map(|hash| {
         let h = String::from(&hash.hash[2..]);
         let xx = hex::decode(h.clone()).expect("Decoding failed");
         let mut dest = [0; 32];
         dest.copy_from_slice(xx.as_slice());
-        (hash.position.parse::<u64>().unwrap(), dest)
-    }).collect()
+        let pos = hash.position.parse::<u64>().unwrap();
+        let index = positions.iter().position(|&x| x == pos).unwrap();
+        let ret = (hash.position.parse::<u64>().unwrap(), dest, index);
+        ret
+    }).collect();
+    unsorted.sort_by(|x, y| x.2.partial_cmp(&y.2).unwrap());
+    unsorted.iter().map(|v| (v.0, v.1)).collect()
 }
 
 pub struct CheckPointInfo {
@@ -132,10 +137,10 @@ async fn main() {
     // 2. query hash by positions from thegraph
     let proof_peaks = query_positions(&url, peaks_pos).await;
     let merkle_proof_nodes = query_positions(&url, merkle_proof_pos).await;
-    let mut merkle_proof: Vec<[u8; 32]> = merkle_proof_nodes.iter().map(|x| { x.1 }).collect();
+    let merkle_proof: Vec<[u8; 32]> = merkle_proof_nodes.iter().map(|x| { x.1 }).collect();
 
     // we need reverse here because the response from thegraph is sorted by id
-    merkle_proof.reverse();
+    //merkle_proof.reverse();
 
     // 3. gen proof by hashes
     let mmr_proof = mmr::gen_proof(merkle_proof, proof_peaks, peak_pos);
